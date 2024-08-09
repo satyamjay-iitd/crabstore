@@ -1,0 +1,15 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+rust-version = "1.80"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Satyam Jay"]
+repository = "https://github.com/rust-lang/rust-analyzer"
+
+
+[workspace.lints.rust]
+
+[workspace.lints.clippy]
