@@ -8,6 +8,17 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
+tokio = { version = "1", features = ["full"]}
+prost.workspace = true
+prost-types.workspace = true
+
+[build-dependencies]
+prost-build = "0.13"
+
 
 [lints]
 workspace = true
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
