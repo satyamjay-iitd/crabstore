@@ -1,12 +1,12 @@
+use crabstore_common;
 use log::info;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncWriteExt;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::signal;
+use tokio_util::codec::Framed;
 
 use crate::allocator::RamAllocator;
 
@@ -56,12 +56,15 @@ async fn handle_client(
 ) -> io::Result<()> {
     let mut data = vec![0; 4];
 
-    loop {
-        stream.readable().await?;
-        let _ = stream.read_exact(&mut data).await?;
-        println!("Read: {}", String::from_utf8(data.clone()).expect(""));
-        stream.writable().await?;
-        let _ = stream.write_all(b"PONG").await?;
-        println!("Wrote: PONG");
+    let mut framed = Framed::new(stream, MessageCodec);
+
+    while let Some(Ok(message)) = framed.next().await {
+        println!("Received: {}", message);
+
+        // You can use the allocator here if needed
+
+        // Send a response
+        framed.send("PONG".to_string()).await.unwrap();
     }
+    Ok(())
 }

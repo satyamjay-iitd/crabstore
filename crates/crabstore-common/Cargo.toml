@@ -12,6 +12,7 @@ rust-version.workspace = true
 [dependencies]
 prost.workspace = true
 prost-types.workspace = true
+tokio-util.workspace = true
 
 [build-dependencies]
 prost-build = "0.13"

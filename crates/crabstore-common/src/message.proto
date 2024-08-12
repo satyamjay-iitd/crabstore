@@ -1,15 +1,128 @@
 syntax = "proto3";
 
-package snazzy.items;
+package message;
 
-// A snazzy new shirt!
-message Shirt {
-  enum Size {
-    SMALL = 0;
-    MEDIUM = 1;
-    LARGE = 2;
-  }
 
-  string color = 1;
-  Size size = 2;
+message CreateRequest {
+  // ID of the object to be created.
+  string object_id = 1;
+  // Owner raylet ID of this object.
+  string owner_raylet_id = 2;
+  // Owner IP address of this object.
+  string owner_ip_address = 3;
+  // Owner port address of this object.
+  uint32 owner_port = 4;
+  // Unique id for the owner worker.
+  string owner_worker_id = 5;
+  // Whether the object will be mutable.
+  bool is_mutable = 6;
+  // The size of the object's data in bytes.
+  uint64 data_size = 7;
+  // The size of the object's metadata in bytes.
+  uint64 metadata_size = 8;
+  // Device to create buffer on.
+  uint32 device_num = 9;
+  // Try the creation request immediately. If this is not possible (due to
+  // out-of-memory), the error will be returned immediately to the client.
+  bool try_immediately = 10;
+
+}
+
+message ObjectSpec {
+  // Index of the memory segment (= memory mapped file) that
+  // this object is allocated in.
+  int32 segment_index = 1;
+
+  // The unique id of the segment fd in case of fd reuse.
+  int64 unique_fd_id = 2;
+
+  // The offset in bytes in the memory mapped file of the plasma object header.
+  uint64 header_offset = 3;
+
+  // The offset in bytes in the memory mapped file of the data.
+  uint64 data_offset = 4;
+
+  // The size in bytes of the data.
+  uint64 data_size = 5;
+
+  // The offset in bytes in the memory mapped file of the metadata.
+  uint64 metadata_offset = 6;
+
+  // The size in bytes of the metadata.
+  uint64 metadata_size = 7;
+
+  // The allocated size. This is just data_size + metadata_size
+  // for immutable objects, but for mutable objects, the data size
+  // and metadata size may change.
+  uint64 allocated_size = 8;
+
+  // Whether this object is on a fallback allocated mmap.
+  bool fallback_allocated = 9;
+
+  // Device to create buffer on.
+  int32 device_num = 10;
+
+  // Whether this is an experimental mutable object that can be written
+  // multiple times by a client.
+  bool is_experimental_mutable_object = 11;
+}
+
+
+enum Error {
+  // Operation was successful.
+  OK = 0;
+
+  // Trying to create an object that already exists.
+  ObjectExists = 1;
+
+  // Trying to access an object that doesn't exist.
+  ObjectNonexistent = 2;
+
+  // Trying to create an object but there isn't enough memory in the store.
+  OutOfMemory = 3;
+
+  // Trying to delete an object but it's not sealed.
+  ObjectNotSealed = 4;
+
+  // Trying to delete an object but it's in use.
+  ObjectInUse = 5;
+
+  // An unexpected error occurred during object creation, such as trying to get
+  // the result of the same request twice. This is most likely due to a system
+  // bug in the plasma store or caller.
+  UnexpectedError = 6;
+
+  // Trying to abort an object but it's not sealed.
+  ObjectSealed = 7;
+
+  // Trying to create an object but there isn't enough disk space.
+  OutOfDisk = 8;
+}
+
+message CudaHandle {
+  // The handle as a sequence of bytes.
+  repeated bytes handle = 1;
+}
+
+
+message CreateResponse {
+  // ID of the object that was created.
+  string object_id = 1;
+  // The client should retry the request if this is > 0. This
+  // is the request ID to include in the retry.
+  uint64 retry_with_request_id = 2;
+  // The object that is returned with this reply.
+  ObjectSpec plasma_object = 3;
+  // Error that occurred for this call.
+  Error error = 4;
+  // The file descriptor in the store that corresponds to the file descriptor
+  // being sent to the client right after this message.
+  int32 store_fd = 5;
+  // The unique id of the store file descriptor in case of fd reuse.
+  int64 unique_fd_id = 6;
+  // The size in bytes of the segment for the store file descriptor (needed to
+  // call mmap).
+  uint64 mmap_size = 7;
+  // CUDA IPC Handle for objects on GPU.
+  CudaHandle ipc_handle = 8;
 }
