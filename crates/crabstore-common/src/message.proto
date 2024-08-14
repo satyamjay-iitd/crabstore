@@ -6,14 +6,6 @@ package message;
 message CreateRequest {
   // ID of the object to be created.
   string object_id = 1;
-  // Owner raylet ID of this object.
-  string owner_raylet_id = 2;
-  // Owner IP address of this object.
-  string owner_ip_address = 3;
-  // Owner port address of this object.
-  uint32 owner_port = 4;
-  // Unique id for the owner worker.
-  string owner_worker_id = 5;
   // Whether the object will be mutable.
   bool is_mutable = 6;
   // The size of the object's data in bytes.

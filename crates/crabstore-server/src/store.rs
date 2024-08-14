@@ -1,4 +1,5 @@
-use crabstore_common;
+use crabstore_common::messages;
+use futures::SinkExt;
 use log::info;
 use std::io;
 use std::path::Path;
@@ -6,6 +7,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::signal;
+use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
 use crate::allocator::RamAllocator;
@@ -50,21 +52,47 @@ impl CrabStore {
     }
 }
 
-async fn handle_client(
-    mut stream: UnixStream,
-    allocator: Arc<Mutex<RamAllocator>>,
-) -> io::Result<()> {
-    let mut data = vec![0; 4];
+async fn handle_client(stream: UnixStream, allocator: Arc<Mutex<RamAllocator>>) -> io::Result<()> {
+    let mut framed = Framed::new(stream, crabstore_common::MessageCodec {});
 
-    let mut framed = Framed::new(stream, MessageCodec);
+    while let Some(request) = framed.next().await {
+        match request {
+            Ok(crabstore_common::Messages::CreateRequest(_cr)) => {
+                let response =
+                    crabstore_common::Messages::CreateResponse(messages::CreateResponse {
+                        object_id: String::from(""),
+                        retry_with_request_id: 0,
+                        plasma_object: Some(messages::ObjectSpec {
+                            segment_index: 0,
+                            unique_fd_id: 0,
+                            header_offset: 0,
+                            data_offset: 0,
+                            data_size: 0,
+                            metadata_offset: 0,
+                            metadata_size: 0,
+                            allocated_size: 0,
+                            fallback_allocated: false,
+                            device_num: 0,
+                            is_experimental_mutable_object: false,
+                        }),
+                        error: 0,
+                        store_fd: 0,
+                        unique_fd_id: 0,
+                        mmap_size: 0,
+                        ipc_handle: Some(messages::CudaHandle {
+                            handle: vec![vec![0; 4]; 4],
+                        }),
+                    });
 
-    while let Some(Ok(message)) = framed.next().await {
-        println!("Received: {}", message);
-
-        // You can use the allocator here if needed
-
-        // Send a response
-        framed.send("PONG".to_string()).await.unwrap();
+                framed.send(response).await?;
+            }
+            Ok(invalid_request) => {
+                println!("Invalid Request = {:?}", invalid_request);
+            }
+            Err(e) => {
+                println!("error on decoding from socket; error = {:?}", e);
+            }
+        }
     }
     Ok(())
 }

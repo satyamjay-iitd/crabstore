@@ -1,33 +1,43 @@
 use std::io;
 use std::path::PathBuf;
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use crabstore_common::ObjectId;
 use tokio::net::UnixStream;
+use tokio_stream::StreamExt;
+use tokio_util::codec::Framed;
 
 pub struct CrabClient {
-    stream: UnixStream,
+    socket_name: PathBuf,
+    stream: Option<UnixStream>,
 }
 
 impl CrabClient {
-    pub async fn new(socket_name: PathBuf) -> io::Result<Self> {
-        let stream = UnixStream::connect(socket_name).await?;
-        Ok(CrabClient { stream })
+    pub async fn new(socket_name: PathBuf) -> Self {
+        CrabClient {
+            socket_name,
+            stream: None,
+        }
     }
 
-    pub async fn send_message(&mut self, msg: &[u8]) -> io::Result<()> {
-        self.stream.writable().await?;
-        self.stream.write_all(msg).await?;
+    pub async fn connect(&mut self) -> io::Result<()> {
+        self.stream = Some(UnixStream::connect(&self.socket_name).await?);
+        Ok(())
+    }
 
-        println!("Wrote {}", String::from_utf8(msg.to_vec()).expect(""));
+    pub async fn create(
+        &mut self,
+        oid: &ObjectId,
+        data_size: u64,
+        metadata_size: u64,
+    ) -> io::Result<()> {
+        let stream = self.stream.expect("Call connect before creating objects");
+        let mut framed = Framed::new(stream, crabstore_common::MessageCodec {});
+        let request =
+            crabstore_common::Messages::CreateRequest(crabstore_common::messages::CreateRequest {
+                object_id: String::from(""),
+            });
+        framed.send(request).await?;
 
-        self.stream.readable().await?;
-        let mut msg = vec![0; 1024];
-        self.stream.read_to_end(&mut msg).await?;
-
-        println!(
-            "{}",
-            String::from_utf8(msg.clone()).expect("Our bytes should be valid utf8")
-        );
         Ok(())
     }
 }
