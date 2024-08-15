@@ -9,6 +9,7 @@ repository.workspace = true
 
 [dependencies]
 crabstore-common = {path = "../crabstore-common"}
+log.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tokio-stream.workspace = true

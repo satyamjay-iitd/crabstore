@@ -1,5 +1,6 @@
-use std::io;
 use std::path::PathBuf;
+
+use log::debug;
 
 use crabstore_common::messages::messages;
 use crabstore_common::messages::MessageCodec;
@@ -7,6 +8,7 @@ use crabstore_common::messages::Messages;
 use crabstore_common::objectid;
 use crabstore_common::status;
 use futures::SinkExt;
+use tokio::io;
 use tokio::net::UnixStream;
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
@@ -26,16 +28,29 @@ impl CrabClient {
 
     pub async fn connect(&mut self) -> io::Result<status::Status> {
         let stream = UnixStream::connect(&self.socket_name).await?;
+        debug!(
+            "Connection with server established on socket_path = {:?}",
+            &self.socket_name
+        );
         self.framed = Some(Framed::new(stream, MessageCodec {}));
 
         let request = Messages::ConnectRequest(messages::ConnectRequest {});
         self.send_request(request).await?;
+        debug!("Sent CONNECTION request to the server");
 
-        if let Ok(Messages::ConnectResponse(_cr)) = self.receive_response().await {
-            println!("{:?}", _cr);
-            Ok(status::Status::ok())
-        } else {
-            Err(io::Error::new(io::ErrorKind::NotFound, ""))
+        match self.receive_response().await {
+            Ok(Messages::ConnectResponse(cr)) => {
+                debug!("Connection response received {:?}", cr);
+                Ok(status::Status::ok())
+            }
+            Ok(r) => {
+                debug!("Invalid response received {:?}", r);
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid response received from sever",
+                ))
+            }
+            Err(err) => Err(err),
         }
     }
 
@@ -54,10 +69,21 @@ impl CrabClient {
             try_immediately: false,
         });
         self.send_request(request).await?;
-        if let Ok(Messages::CreateResponse(_cr)) = self.receive_response().await {
-            Ok(status::Status::ok())
-        } else {
-            Err(io::Error::new(io::ErrorKind::NotFound, ""))
+        debug!("Sent CREATE request to the server");
+
+        match self.receive_response().await {
+            Ok(Messages::CreateResponse(cr)) => {
+                debug!("CREATE response received {:?}", cr);
+                Ok(status::Status::ok())
+            }
+            Ok(r) => {
+                debug!("Invalid response received {:?}", r);
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid response received from sever",
+                ))
+            }
+            Err(err) => Err(err),
         }
     }
 
