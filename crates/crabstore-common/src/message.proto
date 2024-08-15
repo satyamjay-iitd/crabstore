@@ -2,10 +2,15 @@ syntax = "proto3";
 
 package message;
 
+message ConnectRequest {}
+
+message ConnectResponse {
+  uint64 memory_capacity = 1;
+}
 
 message CreateRequest {
   // ID of the object to be created.
-  string object_id = 1;
+  bytes object_id = 1;
   // Whether the object will be mutable.
   bool is_mutable = 6;
   // The size of the object's data in bytes.
@@ -99,7 +104,7 @@ message CudaHandle {
 
 message CreateResponse {
   // ID of the object that was created.
-  string object_id = 1;
+  bytes object_id = 1;
   // The client should retry the request if this is > 0. This
   // is the request ID to include in the retry.
   uint64 retry_with_request_id = 2;

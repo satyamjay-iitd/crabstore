@@ -1,58 +1,89 @@
 use std::io;
 use std::path::PathBuf;
 
-use crabstore_common::ObjectId;
+use crabstore_common::messages::messages;
+use crabstore_common::messages::MessageCodec;
+use crabstore_common::messages::Messages;
+use crabstore_common::objectid;
+use crabstore_common::status;
+use futures::SinkExt;
 use tokio::net::UnixStream;
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
 pub struct CrabClient {
     socket_name: PathBuf,
-    stream: Option<UnixStream>,
+    framed: Option<Framed<UnixStream, MessageCodec>>,
 }
 
 impl CrabClient {
-    pub async fn new(socket_name: PathBuf) -> Self {
+    pub fn new(socket_name: PathBuf) -> Self {
         CrabClient {
             socket_name,
-            stream: None,
+            framed: None,
         }
     }
 
-    pub async fn connect(&mut self) -> io::Result<()> {
-        self.stream = Some(UnixStream::connect(&self.socket_name).await?);
-        Ok(())
+    pub async fn connect(&mut self) -> io::Result<status::Status> {
+        let stream = UnixStream::connect(&self.socket_name).await?;
+        self.framed = Some(Framed::new(stream, MessageCodec {}));
+
+        let request = Messages::ConnectRequest(messages::ConnectRequest {});
+        self.send_request(request).await?;
+
+        if let Ok(Messages::ConnectResponse(_cr)) = self.receive_response().await {
+            println!("{:?}", _cr);
+            Ok(status::Status::ok())
+        } else {
+            Err(io::Error::new(io::ErrorKind::NotFound, ""))
+        }
     }
 
     pub async fn create(
         &mut self,
-        oid: &ObjectId,
+        oid: &objectid::ObjectId,
         data_size: u64,
         metadata_size: u64,
-    ) -> io::Result<()> {
-        let stream = self.stream.expect("Call connect before creating objects");
-        let mut framed = Framed::new(stream, crabstore_common::MessageCodec {});
-        let request =
-            crabstore_common::Messages::CreateRequest(crabstore_common::messages::CreateRequest {
-                object_id: String::from(""),
-            });
-        framed.send(request).await?;
+    ) -> io::Result<status::Status> {
+        let request = Messages::CreateRequest(messages::CreateRequest {
+            object_id: oid.binary(),
+            is_mutable: false,
+            data_size,
+            metadata_size,
+            device_num: 0,
+            try_immediately: false,
+        });
+        self.send_request(request).await?;
+        if let Ok(Messages::CreateResponse(_cr)) = self.receive_response().await {
+            Ok(status::Status::ok())
+        } else {
+            Err(io::Error::new(io::ErrorKind::NotFound, ""))
+        }
+    }
 
+    async fn send_request(&mut self, request: Messages) -> io::Result<()> {
+        if let Some(framed) = &mut self.framed {
+            framed.send(request).await?;
+        } else {
+            return Err(io::Error::new(
+                io::ErrorKind::NotConnected,
+                "Client is not connected",
+            ));
+        }
         Ok(())
     }
+
+    async fn receive_response(&mut self) -> io::Result<Messages> {
+        if let Some(framed) = &mut self.framed {
+            return match framed.next().await {
+                Some(Ok(msg)) => Ok(msg),
+                Some(Err(err)) => Err(err),
+                None => Err(io::Error::new(io::ErrorKind::NotFound, "")),
+            };
+        }
+        Err(io::Error::new(
+            io::ErrorKind::NotConnected,
+            "Client is not connected",
+        ))
+    }
 }
-
-// pub fn add(left: u64, right: u64) -> u64 {
-//     left + right
-// }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn it_works() {
-//         let result = add(2, 2);
-//         assert_eq!(result, 4);
-//     }
-// }
