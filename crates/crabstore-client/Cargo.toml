@@ -7,6 +7,10 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[lib]
+name = "crabstore_client"
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 crabstore-common = {path = "../crabstore-common"}
 log.workspace = true
@@ -16,6 +20,8 @@ tokio-stream.workspace = true
 futures.workspace = true
 prost.workspace = true
 prost-types.workspace = true
+pyo3 = { version = "0.20", features = ["extension-module"] }
+pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
 
 [build-dependencies]
 prost-build = "0.13"
