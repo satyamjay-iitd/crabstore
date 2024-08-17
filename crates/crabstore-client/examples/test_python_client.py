@@ -14,7 +14,8 @@ def main():
     oid = crabstore_client.ObjectID.from_binary(b'00000000000000000000')
 
     print(c.connect())
-    print(c.create(oid, 20, 20))
+    print(c.connect2())
+    # print(c.create(oid, 20, 20))
 
 
 main()

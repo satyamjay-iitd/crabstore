@@ -21,6 +21,7 @@ futures.workspace = true
 prost.workspace = true
 prost-types.workspace = true
 tokio-serde = "0.9"
+bytes.workspace = true
 pyo3 = { version = "0.20", features = ["extension-module"] }
 pyo3-asyncio = { version = "0.20", features = ["attributes", "tokio-runtime"] }
 
