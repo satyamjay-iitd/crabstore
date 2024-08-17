@@ -1,14 +1,20 @@
+import logging
 import asyncio
 import crabstore_client
 
 
-def main():
-    crabstore_client.sleep("/home/satyam/dev/crabstore/sock")
-    # c = crabstore_client.CrabClient("sock")
-    # oid = crabstore_client.ObjectID.from_binary(b'00000000000000000000')
+FORMAT = '%(levelname)s %(name)s %(asctime)-15s %(filename)s:%(lineno)d %(message)s'
+logging.basicConfig(format=FORMAT)
+logging.getLogger().setLevel(logging.INFO)
 
-    # await c.connect()
-    # await c.create(oid, 20, 20)
+
+def main():
+    # await crabstore_client.sleep()
+    c = crabstore_client.CrabClient("sock")
+    oid = crabstore_client.ObjectID.from_binary(b'00000000000000000000')
+
+    print(c.connect())
+    print(c.create(oid, 20, 20))
 
 
 main()

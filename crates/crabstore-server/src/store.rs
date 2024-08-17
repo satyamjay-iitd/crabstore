@@ -2,6 +2,7 @@ use crabstore_common::messages::messages;
 use crabstore_common::messages::MessageCodec;
 use crabstore_common::messages::Messages;
 use futures::SinkExt;
+use log::debug;
 use log::info;
 use std::io;
 use std::path::Path;
@@ -60,6 +61,7 @@ async fn handle_client(stream: UnixStream, allocator: Arc<Mutex<RamAllocator>>) 
     while let Some(request) = framed.next().await {
         match request {
             Ok(Messages::CreateRequest(_cr)) => {
+                debug!("Create request received.");
                 let response = Messages::CreateResponse(messages::CreateResponse {
                     object_id: _cr.object_id,
                     retry_with_request_id: 0,
@@ -88,6 +90,7 @@ async fn handle_client(stream: UnixStream, allocator: Arc<Mutex<RamAllocator>>) 
                 framed.send(response).await?;
             }
             Ok(Messages::ConnectRequest(_cr)) => {
+                debug!("Connect request received.");
                 let response = Messages::ConnectResponse(messages::ConnectResponse {
                     memory_capacity: 200,
                 });

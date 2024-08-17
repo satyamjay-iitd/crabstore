@@ -9,10 +9,10 @@ use crabstore_common::messages::Messages;
 use futures::SinkExt;
 use pyo3::exceptions as pyexceptions;
 use pyo3::prelude::*;
+use std::os::unix::net::UnixStream as SyncUnixStream;
 use std::sync::Arc;
 use tokio::io;
-// use tokio::net::UnixStream;
-use std::os::unix::net::UnixStream;
+use tokio::net::UnixStream;
 use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
@@ -65,39 +65,8 @@ impl CrabClient {
             "Client is not connected",
         ))
     }
-}
-
-#[pymethods]
-impl CrabClient {
-    #[new]
-    pub fn new(socket_name: PathBuf) -> Self {
-        CrabClient {
-            socket_name,
-            framed: None,
-        }
-    }
-
-    // pub fn connect(&mut self, py: Python<'_>) -> PyResult<&PyAny> {
-    //     pyo3_asyncio::tokio::future_into_py(py, async move {
-    //         self.connect_().await;
-    //         Ok(Python::with_gil(|py| py.None()))
-    //     })
-    // }
-
-    // pub fn create(
-    //     &mut self,
-    //     oid: ObjectID,
-    //     data_size: u64,
-    //     metadata_size: u64,
-    // ) -> PyResult<status::Status> {
-    //     pyo3_asyncio::tokio::future_into_py(py, async move {
-    //         self.create_(oid, data_size, metadata_size);
-    //         Ok(Python::with_gil(|py| py.None()))
-    //     })
-    // }
-
-    pub async fn connect(&mut self) -> PyResult<status::Status> {
-        let stream = UnixStream::connect(&self.socket_name)?;
+    async fn connect_(&mut self) -> PyResult<status::Status> {
+        let stream = UnixStream::connect(&self.socket_name).await?;
         debug!(
             "Connection with server established on socket_path = {:?}",
             &self.socket_name
@@ -123,7 +92,33 @@ impl CrabClient {
         }
     }
 
-    pub async fn create(
+    fn connect2(&mut self) -> PyResult<status::Status> {
+        let stream = SyncUnixStream::connect(&self.socket_name)?;
+        debug!(
+            "Connection with server established on socket_path = {:?}",
+            &self.socket_name
+        );
+        self.framed = Some(Arc::new(Mutex::new(Framed::new(stream, MessageCodec {}))));
+
+        let request = Messages::ConnectRequest(messages::ConnectRequest {});
+        self.send_request(request).await?;
+        debug!("Sent CONNECTION request to the server");
+
+        match self.receive_response().await {
+            Ok(Messages::ConnectResponse(cr)) => {
+                debug!("Connection response received {:?}", cr);
+                Ok(status::Status::ok())
+            }
+            Ok(r) => {
+                debug!("Invalid response received {:?}", r);
+                Err(pyexceptions::PyValueError::new_err(
+                    "Invalid response received from sever",
+                ))
+            }
+            Err(_) => Err(pyexceptions::PyConnectionError::new_err("")),
+        }
+    }
+    pub async fn create_(
         &mut self,
         oid: ObjectID,
         data_size: u64,
@@ -153,5 +148,56 @@ impl CrabClient {
             }
             Err(_) => Err(pyexceptions::PyConnectionError::new_err("")),
         }
+    }
+}
+
+#[pymethods]
+impl CrabClient {
+    #[new]
+    pub fn new(socket_name: PathBuf) -> Self {
+        CrabClient {
+            socket_name,
+            framed: None,
+        }
+    }
+
+    // pub fn connect(&mut self, py: Python) -> PyResult<&PyAny> {
+    //     pyo3_asyncio::tokio::future_into_py(py, async move {
+    //         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    //         Ok(Python::with_gil(|py| py.None()))
+    //     })
+    // pyo3_asyncio::tokio::future_into_py(py, async {
+    //     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    //     // self.connect_();
+    //     Ok(Python::with_gil(|py| py.None()))
+    // })
+    // let rt = tokio::runtime::Runtime::new().unwrap();
+    // let status = rt.block_on(self.connect_());
+    // rt.shutdown_background();
+    // status
+    // }
+
+    pub fn connect(&mut self, py: Python<'_>) -> PyResult<&PyAny> {
+        pyo3_asyncio::tokio::future_into_py(py, async move {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+            // Obtain the GIL after the await point
+            Python::with_gil(|py| Ok(py.None()))
+        })
+    }
+
+    pub fn create(
+        &mut self,
+        oid: ObjectID,
+        data_size: u64,
+        metadata_size: u64,
+    ) -> PyResult<status::Status> {
+        println!(";askdkasdffds");
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        println!("q029 8340293 840=2340=");
+        let x = rt.block_on(self.create_(oid, data_size, metadata_size));
+        println!("q029 8340293 840=2340=");
+        rt.shutdown_background();
+        x
     }
 }

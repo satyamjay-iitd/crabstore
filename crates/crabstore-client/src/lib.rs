@@ -1,17 +1,9 @@
-pub mod client;
-use std::{io, os::unix::net::UnixStream, path::PathBuf};
+pub mod client2;
 mod status;
-use pyo3::prelude::*;
+// use pyo3::prelude::*;
 
-#[pyfunction]
-fn sleep(socket_name: PathBuf) -> io::Result<()> {
-    UnixStream::connect(socket_name)?;
-    Ok(())
-}
-
-#[pymodule]
-fn crabstore_client(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<client::CrabClient>()?;
-    m.add_class::<client::ObjectID>()?;
-    m.add_function(wrap_pyfunction!(sleep, m)?)
-}
+// #[pymodule]
+// fn crabstore_client(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+//     m.add_class::<client::ObjectID>()?;
+//     m.add_class::<client::CrabClient>()
+// }

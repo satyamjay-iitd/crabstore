@@ -24,7 +24,7 @@ pub enum Messages {
     CreateResponse(messages::CreateResponse),
 }
 
-pub struct MessageCodec {}
+pub struct MessageCodec;
 
 impl Decoder for MessageCodec {
     type Item = Messages;
