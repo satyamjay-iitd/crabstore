@@ -11,7 +11,8 @@ use pyo3::exceptions as pyexceptions;
 use pyo3::prelude::*;
 use std::sync::Arc;
 use tokio::io;
-use tokio::net::UnixStream;
+// use tokio::net::UnixStream;
+use std::os::unix::net::UnixStream;
 use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
@@ -64,9 +65,39 @@ impl CrabClient {
             "Client is not connected",
         ))
     }
+}
 
-    pub async fn connect_(&mut self) -> PyResult<status::Status> {
-        let stream = UnixStream::connect(&self.socket_name).await?;
+#[pymethods]
+impl CrabClient {
+    #[new]
+    pub fn new(socket_name: PathBuf) -> Self {
+        CrabClient {
+            socket_name,
+            framed: None,
+        }
+    }
+
+    // pub fn connect(&mut self, py: Python<'_>) -> PyResult<&PyAny> {
+    //     pyo3_asyncio::tokio::future_into_py(py, async move {
+    //         self.connect_().await;
+    //         Ok(Python::with_gil(|py| py.None()))
+    //     })
+    // }
+
+    // pub fn create(
+    //     &mut self,
+    //     oid: ObjectID,
+    //     data_size: u64,
+    //     metadata_size: u64,
+    // ) -> PyResult<status::Status> {
+    //     pyo3_asyncio::tokio::future_into_py(py, async move {
+    //         self.create_(oid, data_size, metadata_size);
+    //         Ok(Python::with_gil(|py| py.None()))
+    //     })
+    // }
+
+    pub async fn connect(&mut self) -> PyResult<status::Status> {
+        let stream = UnixStream::connect(&self.socket_name)?;
         debug!(
             "Connection with server established on socket_path = {:?}",
             &self.socket_name
@@ -92,7 +123,7 @@ impl CrabClient {
         }
     }
 
-    pub async fn create_(
+    pub async fn create(
         &mut self,
         oid: ObjectID,
         data_size: u64,
@@ -122,31 +153,5 @@ impl CrabClient {
             }
             Err(_) => Err(pyexceptions::PyConnectionError::new_err("")),
         }
-    }
-}
-
-#[pymethods]
-impl CrabClient {
-    #[new]
-    pub fn new(socket_name: PathBuf) -> Self {
-        CrabClient {
-            socket_name,
-            framed: None,
-        }
-    }
-
-    pub fn connect(&mut self, py: Python<'_>) -> PyResult<&PyAny> {
-        pyo3_asyncio::tokio::future_into_py(py, async { self.connect_().await })
-    }
-
-    pub fn create(
-        &mut self,
-        oid: ObjectID,
-        data_size: u64,
-        metadata_size: u64,
-    ) -> PyResult<status::Status> {
-        pyo3_asyncio::tokio::future_into_py(py, async {
-            self.create_(oid, data_size, metadata_size)
-        })
     }
 }

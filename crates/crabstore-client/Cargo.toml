@@ -20,8 +20,7 @@ tokio-stream.workspace = true
 futures.workspace = true
 prost.workspace = true
 prost-types.workspace = true
-pyo3 = { version = "0.20", features = ["extension-module"] }
-pyo3-asyncio = { version = "0.20", features = ["tokio-runtime"] }
+pyo3 = { version = "0.22.2", features = ["extension-module", "experimental-async"] }
 
 [build-dependencies]
 prost-build = "0.13"
