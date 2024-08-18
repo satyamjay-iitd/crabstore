@@ -108,15 +108,7 @@ impl Encoder<Messages> for MessageCodec {
                 dst.put_u16_le(message_type);
                 dst.put_u64_le(messages::ConnectResponse::encoded_len(&cr) as u64);
 
-                println!(
-                    "{:?}, {:?}, {}",
-                    message_type.to_le(),
-                    (messages::ConnectResponse::encoded_len(&cr) as u64).to_le(),
-                    messages::ConnectResponse::encoded_len(&cr)
-                );
-
                 cr.encode(dst)?;
-                println!("{:?}, {}", dst, dst.len());
                 Ok(())
             }
             Messages::CreateRequest(cr) => {

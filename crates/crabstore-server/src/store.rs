@@ -3,6 +3,7 @@ use crabstore_common::messages::MessageCodec;
 use crabstore_common::messages::Messages;
 use futures::SinkExt;
 use log::debug;
+use log::error;
 use log::info;
 use std::io;
 use std::path::Path;
@@ -97,10 +98,10 @@ async fn handle_client(stream: UnixStream, allocator: Arc<Mutex<RamAllocator>>) 
                 framed.send(response).await?;
             }
             Ok(invalid_request) => {
-                println!("Invalid Request = {:?}", invalid_request);
+                error!("Invalid Request = {:?}", invalid_request);
             }
             Err(e) => {
-                println!("error on decoding from socket; error = {:?}", e);
+                error!("error on decoding from socket; error = {:?}", e);
             }
         }
     }
