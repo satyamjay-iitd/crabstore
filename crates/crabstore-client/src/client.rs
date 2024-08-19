@@ -198,7 +198,6 @@ impl CrabClient {
         unsafe {
             let ptr = self.allocator.malloc(data_size, 1);
 
-            PyMemoryView::from(ptr);
             Ok(PyByteArray::new_bound(
                 py,
                 slice::from_raw_parts(ptr, data_size),
