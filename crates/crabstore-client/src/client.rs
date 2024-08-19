@@ -2,10 +2,15 @@ use bytes::BytesMut;
 use crabstore_common::messages::messages;
 use crabstore_common::messages::MessageCodec;
 use crabstore_common::messages::Messages;
+use dlmalloc::Dlmalloc;
 use log::debug;
 use prost::Message;
 use pyo3::exceptions as pyexceptions;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyByteArray;
+use pyo3::types::PyBytes;
+use pyo3::types::PyMemoryView;
 use std::io;
 use std::io::Read;
 use std::io::Write;
@@ -13,7 +18,9 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use crate::status;
+use crate::allocator;
+use std::borrow::Cow;
+use std::slice;
 use tokio_util::codec::Encoder;
 
 #[pyclass]
@@ -32,6 +39,7 @@ impl ObjectID {
 pub struct CrabClient {
     socket_name: PathBuf,
     stream: Option<Mutex<UnixStream>>,
+    allocator: Dlmalloc<allocator::UnixSHM>,
 }
 
 impl CrabClient {
@@ -129,6 +137,12 @@ impl CrabClient {
             ))
         }
     }
+
+    fn reserve_oid(&mut self, oid: ObjectID) -> bool {
+        true
+    }
+
+    fn notify_allocation(&mut self) {}
 }
 
 #[pymethods]
@@ -138,10 +152,11 @@ impl CrabClient {
         CrabClient {
             socket_name,
             stream: None,
+            allocator: Dlmalloc::new_with_allocator(allocator::UnixSHM::new()),
         }
     }
 
-    pub fn connect(&mut self) -> PyResult<status::Status> {
+    pub fn connect(&mut self) -> PyResult<()> {
         let stream = UnixStream::connect(&self.socket_name)?;
         debug!(
             "Connection with server established on socket_path = {:?}",
@@ -156,7 +171,7 @@ impl CrabClient {
         match self.receive_response() {
             Ok(Messages::ConnectResponse(cr)) => {
                 debug!("Connection response received {:?}", cr);
-                Ok(status::Status::ok())
+                Ok(())
             }
             Ok(r) => {
                 debug!("Invalid response received {:?}", r);
@@ -168,35 +183,34 @@ impl CrabClient {
         }
     }
 
-    pub fn create(
+    pub fn create<'a>(
         &mut self,
+        py: Python<'a>,
         oid: ObjectID,
-        data_size: u64,
-        metadata_size: u64,
-    ) -> PyResult<status::Status> {
-        let request = Messages::CreateRequest(messages::CreateRequest {
-            object_id: oid.0.binary(),
-            is_mutable: false,
-            data_size,
-            metadata_size,
-            device_num: 0,
-            try_immediately: false,
-        });
-        self.send_request(request)?;
-        debug!("Sent CREATE request to the server");
-
-        match self.receive_response() {
-            Ok(Messages::CreateResponse(cr)) => {
-                debug!("CREATE response received {:?}", cr);
-                Ok(status::Status::ok())
-            }
-            Ok(r) => {
-                debug!("Invalid response received {:?}", r);
-                Err(pyexceptions::PyValueError::new_err(
-                    "Invalid response received from sever",
-                ))
-            }
-            Err(_) => Err(pyexceptions::PyConnectionError::new_err("")),
+        data_size: usize,
+        // ) -> PyResult<Bound<'a, PyBytes>> {
+    ) -> PyResult<Bound<'a, PyByteArray>> {
+        // ) -> PyResult<PyBytes> {
+        if !self.reserve_oid(oid) {
+            return Err(PyValueError::new_err("ObjectID not available"));
         }
+
+        unsafe {
+            let ptr = self.allocator.malloc(data_size, 1);
+
+            PyMemoryView::from(ptr);
+            Ok(PyByteArray::new_bound(
+                py,
+                slice::from_raw_parts(ptr, data_size),
+            ))
+            // Ok(PyByteArray::bound_from_ptr(py, ptr, data_size));
+            // Ok(PyBytes::new_bound_with(ptr))
+            // Ok(PyBytes::bound_from_ptr(py, ptr, data_size))
+            // return Ok(Cow::Borrowed(slice));
+        }
+
+        // self.notify_allocation();
+
+        // return Err(PyValueError::new_err(""));
     }
 }

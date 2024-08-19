@@ -12,6 +12,7 @@ pub enum StatusCode {
     Invalid,
     IOError,
     InvalidArgument,
+    OIDUnavailable,
 }
 
 #[pyclass]
@@ -60,6 +61,10 @@ impl Status {
         Status::from_error(StatusCode::TypeError, msg, -1)
     }
 
+    pub fn oid_unavailable_error(msg: String) -> Self {
+        Status::from_error(StatusCode::OIDUnavailable, msg, -1)
+    }
+
     pub fn is_ok(&self) -> bool {
         self.state.is_none()
     }
@@ -105,7 +110,7 @@ impl Status {
             StatusCode::Invalid => "Invalid".to_string(),
             StatusCode::IOError => "IOError".to_string(),
             StatusCode::InvalidArgument => "InvalidArgument".to_string(),
-            // Add more cases here as needed
+            StatusCode::OIDUnavailable => "ObjectIDUnavailable".to_string(), // Add more cases here as needed
         }
     }
 }

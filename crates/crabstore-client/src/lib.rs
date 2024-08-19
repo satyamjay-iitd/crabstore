@@ -1,3 +1,4 @@
+mod allocator;
 pub mod client;
 mod status;
 use pyo3::prelude::*;
