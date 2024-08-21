@@ -5,6 +5,12 @@ use crabstore_common::messages::Messages;
 use dlmalloc::Dlmalloc;
 use log::debug;
 use prost::Message;
+use pyo3::exceptions as pyexceptions;
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+use pyo3::types::PyByteArray;
+use pyo3::types::PyBytes;
+use pyo3::types::PyMemoryView;
 use std::io;
 use std::io::Read;
 use std::io::Write;
@@ -17,15 +23,19 @@ use std::borrow::Cow;
 use std::slice;
 use tokio_util::codec::Encoder;
 
+#[pyclass]
 #[derive(Clone)]
 pub struct ObjectID(crabstore_common::objectid::ObjectId);
 
+#[pymethods]
 impl ObjectID {
+    #[staticmethod]
     pub fn from_binary(binary: &[u8]) -> Self {
         ObjectID(crabstore_common::objectid::ObjectId::from_binary(binary))
     }
 }
 
+#[pyclass]
 pub struct CrabClient {
     socket_name: PathBuf,
     stream: Option<Mutex<UnixStream>>,
@@ -135,7 +145,9 @@ impl CrabClient {
     fn notify_allocation(&mut self) {}
 }
 
+#[pymethods]
 impl CrabClient {
+    #[new]
     pub fn new(socket_name: PathBuf) -> Self {
         CrabClient {
             socket_name,
@@ -144,25 +156,16 @@ impl CrabClient {
         }
     }
 
-    pub fn connect(&mut self) -> Result<(),String> {
-        match UnixStream::connect(&self.socket_name) {
-            Err(e) => {
-                return Err(e.to_string())
-            },
-            Ok(stream) => {
-                self.stream = Some(Mutex::new(stream));
-            }
-        };
+    pub fn connect(&mut self) -> PyResult<()> {
+        let stream = UnixStream::connect(&self.socket_name)?;
         debug!(
             "Connection with server established on socket_path = {:?}",
             &self.socket_name
         );
+        self.stream = Some(Mutex::new(stream));
 
         let request = Messages::ConnectRequest(messages::ConnectRequest {});
-        match self.send_request(request) {
-            Err(e) => return Err(e.to_string()),
-                _ => {}
-        };
+        self.send_request(request)?;
         debug!("Sent CONNECTION request to the server");
 
         match self.receive_response() {
@@ -172,24 +175,41 @@ impl CrabClient {
             }
             Ok(r) => {
                 debug!("Invalid response received {:?}", r);
-                Err("Invalid response received from sever".to_string())
+                Err(pyexceptions::PyValueError::new_err(
+                    "Invalid response received from sever",
+                ))
             }
-            Err(e) => Err(e.to_string())
+            Err(_) => Err(pyexceptions::PyConnectionError::new_err("")),
         }
     }
 
     pub fn create<'a>(
         &mut self,
+        py: Python<'a>,
         oid: ObjectID,
         data_size: usize,
-    ) -> Result<&[u8],&'static str> {
+        // ) -> PyResult<Bound<'a, PyBytes>> {
+    ) -> PyResult<Bound<'a, PyByteArray>> {
+        // ) -> PyResult<PyBytes> {
         if !self.reserve_oid(oid) {
-            return Err("ObjectID not available");
+            return Err(PyValueError::new_err("ObjectID not available"));
         }
 
         unsafe {
             let ptr = self.allocator.malloc(data_size, 1);
-            Ok(slice::from_raw_parts(ptr, data_size))
+
+            Ok(PyByteArray::new_bound(
+                py,
+                slice::from_raw_parts(ptr, data_size),
+            ))
+            // Ok(PyByteArray::bound_from_ptr(py, ptr, data_size));
+            // Ok(PyBytes::new_bound_with(ptr))
+            // Ok(PyBytes::bound_from_ptr(py, ptr, data_size))
+            // return Ok(Cow::Borrowed(slice));
         }
+
+        // self.notify_allocation();
+
+        // return Err(PyValueError::new_err(""));
     }
 }

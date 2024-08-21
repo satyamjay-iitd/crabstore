@@ -1,3 +1,4 @@
+use pyo3::prelude::*;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,6 +15,7 @@ pub enum StatusCode {
     OIDUnavailable,
 }
 
+#[pyclass]
 #[derive(Debug, Clone)]
 pub struct Status {
     state: Option<Box<State>>,

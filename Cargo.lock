@@ -210,7 +210,6 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
- "pyo3",
  "tokio",
  "tokio-serde",
  "tokio-stream",
@@ -224,6 +223,27 @@ dependencies = [
  "prost",
  "prost-build",
  "prost-types",
+ "tokio-util",
+]
+
+[[package]]
+name = "crabstore-python-client"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "crabstore-common",
+ "dlmalloc",
+ "futures",
+ "libc",
+ "log",
+ "nix",
+ "prost",
+ "prost-build",
+ "prost-types",
+ "pyo3",
+ "tokio",
+ "tokio-serde",
+ "tokio-stream",
  "tokio-util",
 ]
 
