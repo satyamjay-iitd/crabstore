@@ -3,7 +3,9 @@ use crabstore_common::messages::messages;
 use crabstore_common::messages::MessageCodec;
 use crabstore_common::messages::Messages;
 use dlmalloc::Dlmalloc;
+
 use log::debug;
+
 use prost::Message;
 use std::io;
 use std::io::Read;
@@ -13,9 +15,9 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use crate::allocator;
-use std::borrow::Cow;
 use std::slice;
 use tokio_util::codec::Encoder;
+
 
 #[derive(Clone)]
 pub struct ObjectID(crabstore_common::objectid::ObjectId);
@@ -112,6 +114,26 @@ impl CrabClient {
                         )),
                     }
                 }
+                4 => {
+                    let cr = messages::OidReserveRequest::decode(src);
+                    match cr {
+                        Ok(cr) => Ok(Messages::OidReserveRequest(cr)),
+                        Err(_) => Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Message decoding failed",
+                        )),
+                    }
+                }
+                5 => {
+                    let cr = messages::OidReserveResponse::decode(src);
+                    match cr {
+                        Ok(cr) => Ok(Messages::OidReserveResponse(cr)),
+                        Err(_) => Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Message decoding failed",
+                        )),
+                    }
+                }
                 _ => {
                     // Unknown message type
                     Err(io::Error::new(
@@ -128,11 +150,30 @@ impl CrabClient {
         }
     }
 
-    fn reserve_oid(&mut self, oid: ObjectID) -> bool {
-        true
-    }
+    fn reserve_oid(&mut self, oid: ObjectID, size: u64) -> io::Result<bool> {
+        let request = Messages::OidReserveRequest(messages::OidReserveRequest {
+            object_id: oid.0.binary(),
+            size,
+        });
+        self.send_request(request)?;
 
-    fn notify_allocation(&mut self) {}
+        debug!("Sent Oid Reserve request to the server");
+        match self.receive_response() {
+            Ok(Messages::OidReserveResponse(cr)) => {
+                debug!("OidReserve response received {:?}", cr);
+                println!("OidReserve response received {:?}", cr);
+                Ok(true)
+            }
+            Ok(r) => {
+                debug!("Invalid response received {:?}", r);
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid response received from sever",
+                ))
+            }
+            Err(err) => Err(err),
+        }
+    }
 }
 
 impl CrabClient {
@@ -183,7 +224,7 @@ impl CrabClient {
         oid: ObjectID,
         data_size: usize,
     ) -> Result<&[u8],&'static str> {
-        if !self.reserve_oid(oid) {
+        if self.reserve_oid(oid, data_size as u64).is_err() {
             return Err("ObjectID not available");
         }
 

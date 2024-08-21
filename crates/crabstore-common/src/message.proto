@@ -8,6 +8,22 @@ message ConnectResponse {
   uint64 memory_capacity = 1;
 }
 
+message OidReserveRequest {
+  bytes object_id = 1;
+  uint64 size = 2;
+}
+
+enum OIDState {
+  UNRESERVED = 0;
+  RESERVED = 1;
+  SEALED = 2;
+  OUT_OF_MEMORY = 3;
+}
+
+message OidReserveResponse {
+  OIDState oid_state = 1;
+}
+
 message CreateRequest {
   // ID of the object to be created.
   bytes object_id = 1;

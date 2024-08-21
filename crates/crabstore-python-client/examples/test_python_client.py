@@ -1,3 +1,5 @@
+from time import sleep
+import argparse
 import logging
 import random
 import crabstore_client
@@ -9,8 +11,20 @@ logging.basicConfig(format=FORMAT)
 logging.getLogger().setLevel(logging.INFO)
 
 
+def alloc(c, size: int):
+    oid = crabstore_client.ObjectID.from_binary(b'00000000000000000000')
+    b = c.create(oid, size)
+    arr = np.frombuffer(b)
+    arr[0] = 234
+    sleep(0.2)
+
+
 def main():
-    c = crabstore_client.CrabClient("sock")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('sock_path', default='sock_path', type=str)
+
+    args = parser.parse_args()
+    c = crabstore_client.CrabClient(args.sock_path)
     oid = crabstore_client.ObjectID.from_binary(b'00000000000000000000')
 
     """
@@ -21,10 +35,26 @@ def main():
         array[0], array[-1] = 0, -1
     """
     c.connect()
-    b = c.create(oid, 256)
 
-    arr = np.frombuffer(b)
-    arr[0] = random.randint(0, 255)
+    for i in range(100):
+        alloc(c, 2**30)
+
+        
+    # l = []
+    # for i in range(100):
+    #     oid = crabstore_client.ObjectID.from_binary(b'00000000000000000000')
+    #     b = c.create(oid, 2**30)
+    #     arr = np.frombuffer(b)
+    #     arr[0] = 234
+    #     sleep(0.2)
+    #     l.append(b)
+    # b = c.create(oid, 2**30)
+
+    # sleep(100)
+
+    # arr = np.frombuffer(b)
+    # arr[0] = 234
+    # print(arr)
 
 
 main()
