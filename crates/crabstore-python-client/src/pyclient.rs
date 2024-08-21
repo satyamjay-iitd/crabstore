@@ -1,28 +1,11 @@
-use bytes::BytesMut;
-use crabstore_common::messages::messages;
-use crabstore_common::messages::MessageCodec;
-use crabstore_common::messages::Messages;
-use dlmalloc::Dlmalloc;
+use std::path::PathBuf;
 use crabstore_client::client::{CrabClient,ObjectID};
-
-use log::debug;
-
-use prost::Message;
 
 use pyo3::exceptions as pyexceptions;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyMemoryView;
 use pyo3::Bound;
-
-use std::io;
-use std::io::Read;
-use std::io::Write;
-use std::os::unix::net::UnixStream;
-use std::path::PathBuf;
-use std::sync::Mutex;
-
-use tokio_util::codec::Encoder;
 
 use crate::rust_2_py::FromPtr;
 
@@ -41,20 +24,6 @@ impl PyObjectID {
 #[pyclass]
 pub struct PyCrabClient {
     crabclient: CrabClient,
-}
-
-impl PyCrabClient {
-    fn send_request(&mut self, request: Messages) -> Result<(), io::Error> {
-        self.crabclient.send_request(request)
-    }
-
-    fn receive_response(&mut self) -> Result<Messages, io::Error> {
-        self.crabclient.receive_response()
-    }
-
-    fn reserve_oid(&mut self, oid: ObjectID, size: u64) -> io::Result<bool> {
-        self.crabclient.reserve_oid(oid, size)
-    }
 }
 
 #[pymethods]
