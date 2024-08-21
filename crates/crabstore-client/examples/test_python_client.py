@@ -1,4 +1,5 @@
 from time import sleep
+import argparse
 import logging
 import random
 import crabstore_client
@@ -19,7 +20,11 @@ def alloc(c, size: int):
 
 
 def main():
-    c = crabstore_client.CrabClient("sock")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('sock_path', default='sock_path', type=str)
+
+    args = parser.parse_args()
+    c = crabstore_client.CrabClient(args.sock_path)
     oid = crabstore_client.ObjectID.from_binary(b'00000000000000000000')
 
     """
