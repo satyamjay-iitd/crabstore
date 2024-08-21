@@ -89,7 +89,7 @@ async fn handle_client(stream: UnixStream) -> io::Result<()> {
                 framed.send(response).await?;
             }
             Ok(Messages::OidReserveRequest(_cr)) => {
-                debug!("Connect request received.");
+                debug!("Oid request received.");
                 let response =
                     Messages::OidReserveResponse(messages::OidReserveResponse { oid_state: 0 });
                 framed.send(response).await?;

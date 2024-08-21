@@ -77,6 +77,20 @@ impl Decoder for MessageCodec {
                     Err(_) => None,
                 }
             }
+            4 => {
+                let cr = messages::OidReserveRequest::decode(src);
+                match cr {
+                    Ok(cr) => Some(Messages::OidReserveRequest(cr)),
+                    Err(_) => None,
+                }
+            }
+            5 => {
+                let cr = messages::OidReserveResponse::decode(src);
+                match cr {
+                    Ok(cr) => Some(Messages::OidReserveResponse(cr)),
+                    Err(_) => None,
+                }
+            }
             _ => {
                 // Unknown message type
                 return Err(io::Error::new(

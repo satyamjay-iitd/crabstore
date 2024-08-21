@@ -125,6 +125,26 @@ impl CrabClient {
                         )),
                     }
                 }
+                4 => {
+                    let cr = messages::OidReserveRequest::decode(src);
+                    match cr {
+                        Ok(cr) => Ok(Messages::OidReserveRequest(cr)),
+                        Err(_) => Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Message decoding failed",
+                        )),
+                    }
+                }
+                5 => {
+                    let cr = messages::OidReserveResponse::decode(src);
+                    match cr {
+                        Ok(cr) => Ok(Messages::OidReserveResponse(cr)),
+                        Err(_) => Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Message decoding failed",
+                        )),
+                    }
+                }
                 _ => {
                     // Unknown message type
                     Err(io::Error::new(
@@ -151,7 +171,8 @@ impl CrabClient {
         debug!("Sent Oid Reserve request to the server");
         match self.receive_response() {
             Ok(Messages::OidReserveResponse(cr)) => {
-                debug!("Connection response received {:?}", cr);
+                debug!("OidReserve response received {:?}", cr);
+                println!("OidReserve response received {:?}", cr);
                 Ok(true)
             }
             Ok(r) => {
