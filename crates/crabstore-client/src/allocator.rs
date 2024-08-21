@@ -4,7 +4,8 @@ use core::ptr;
 use dlmalloc::Allocator;
 
 use nix;
-use std::os::fd::AsFd;
+use std::os::fd::{AsFd,AsRawFd};
+use std::os::raw::c_int;
 use std::string::ToString;
 
 struct MMapRecord {
@@ -12,7 +13,7 @@ struct MMapRecord {
 }
 
 impl MMapRecord {
-    pub fn new() -> MMapRecord {
+    pub fn new() -> Self {
         MMapRecord {
             addr2fdsize: std::collections::HashMap::new(),
         }
@@ -35,6 +36,18 @@ impl MMapRecord {
     ) -> Option<(std::os::fd::OwnedFd, usize)> {
         self.addr2fdsize.remove(&((*addr).as_ptr() as *mut u8))
     }
+
+    pub fn get_fd_offset_for_ptr(&self, ptr: *mut u8) -> Option<(c_int, usize)> {
+        let ptr_us = ptr as usize;
+        for (mp, t) in self.addr2fdsize.iter() {
+            let (fd,sz) = t;
+            let mp_us = (*mp) as usize;
+            if (ptr_us - mp_us) < *sz {
+                return Some(((*fd).as_raw_fd(), ptr_us - mp_us))
+            }
+        }
+        None
+    }
 }
 
 // convince the compiler that storing pointers in MMapRecord is fine
@@ -55,6 +68,10 @@ impl UnixSHM {
             counter: 0,
             mmaps: MMapRecord::new(),
         }
+    }
+
+    pub fn get_fd_offset_for_ptr(&self, ptr: *mut u8) -> Option<(c_int, usize)> {
+        self.mmaps.get_fd_offset_for_ptr(ptr)
     }
 
     fn get_next_path(&mut self) -> std::string::String {

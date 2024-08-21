@@ -11,11 +11,13 @@ pub mod messages {
 #[repr(u16)]
 enum MessageType {
     ConnectRequestMT = 0,
-    ConnectResponseMT = 1,
-    CreateRequestMT = 2,
-    CreateResponseMT = 3,
-    OidReserveRequestMT = 4,
-    OidReserveResponseMT = 5,
+    ConnectResponseMT,
+    CreateRequestMT,
+    CreateResponseMT,
+    OidReserveRequestMT,
+    OidReserveResponseMT,
+    OidSealRequestMT,
+    OidSealResponseMT,
 }
 
 #[derive(Debug)]
@@ -26,6 +28,8 @@ pub enum Messages {
     CreateResponse(messages::CreateResponse),
     OidReserveRequest(messages::OidReserveRequest),
     OidReserveResponse(messages::OidReserveResponse),
+    OidSealRequest(messages::OidSealRequest),
+    OidSealResponse(messages::OidSealResponse),
 }
 
 pub struct MessageCodec;
@@ -88,6 +92,20 @@ impl Decoder for MessageCodec {
                 let cr = messages::OidReserveResponse::decode(src);
                 match cr {
                     Ok(cr) => Some(Messages::OidReserveResponse(cr)),
+                    Err(_) => None,
+                }
+            }
+            6 => {
+                let cr = messages::OidSealRequest::decode(src);
+                match cr {
+                    Ok(cr) => Some(Messages::OidSealRequest(cr)),
+                    Err(_) => None,
+                }
+            }
+            7 => {
+                let cr = messages::OidSealResponse::decode(src);
+                match cr {
+                    Ok(cr) => Some(Messages::OidSealResponse(cr)),
                     Err(_) => None,
                 }
             }
@@ -157,6 +175,22 @@ impl Encoder<Messages> for MessageCodec {
                 let message_type = MessageType::OidReserveResponseMT as u16;
                 dst.put_u16_le(message_type);
                 dst.put_u64_le(messages::OidReserveResponse::encoded_len(&cr) as u64);
+
+                cr.encode(dst)?;
+                Ok(())
+            }
+            Messages::OidSealRequest(cr) => {
+                let message_type = MessageType::OidSealRequestMT as u16;
+                dst.put_u16_le(message_type);
+                dst.put_u64_le(messages::OidSealRequest::encoded_len(&cr) as u64);
+
+                cr.encode(dst)?;
+                Ok(())
+            }
+            Messages::OidSealResponse(cr) => {
+                let message_type = MessageType::OidSealResponseMT as u16;
+                dst.put_u16_le(message_type);
+                dst.put_u64_le(messages::OidSealResponse::encoded_len(&cr) as u64);
 
                 cr.encode(dst)?;
                 Ok(())

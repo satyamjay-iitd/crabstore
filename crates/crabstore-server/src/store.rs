@@ -46,7 +46,7 @@ impl CrabStore {
         Ok(())
     }
 
-    pub async fn cleanup(&self) -> io::Result<()> {
+    async fn cleanup(&self) -> io::Result<()> {
         // remove the created socket
         if Path::new(&self.socket_path).exists() {
             info!("Removing socket at path {:?}", self.socket_path);
@@ -100,9 +100,17 @@ async fn handle_client(stream: UnixStream) -> io::Result<()> {
                 framed.send(response).await?;
             }
             Ok(Messages::OidReserveRequest(_cr)) => {
-                debug!("Oid request received.");
+                debug!("Oid reserve request received.");
+                // TODO implement actual checking
                 let response =
-                    Messages::OidReserveResponse(messages::OidReserveResponse { oid_state: 0 });
+                    Messages::OidReserveResponse(messages::OidReserveResponse { oid_state: messages::OidState::Reserved as i32});
+                framed.send(response).await?;
+            }
+            Ok(Messages::OidSealRequest(_cr)) => {
+                debug!("Oid seal request received.");
+                // TODO implement actual checking
+                let response =
+                    Messages::OidSealResponse(messages::OidSealResponse { oid_state: messages::OidState::Sealed as i32});
                 framed.send(response).await?;
             }
             Ok(invalid_request) => {

@@ -41,6 +41,17 @@ message CreateRequest {
 
 }
 
+message OidSealRequest {
+  bytes object_id = 1;
+  int32 fd = 2;
+  uint64 offset = 3;
+  uint64 size = 4;
+}
+
+message OidSealResponse {
+  OIDState oid_state = 1;
+}
+
 message ObjectSpec {
   // Index of the memory segment (= memory mapped file) that
   // this object is allocated in.

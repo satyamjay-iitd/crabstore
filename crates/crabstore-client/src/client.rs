@@ -1,10 +1,16 @@
+use std::fmt;
+
 use bytes::BytesMut;
 use crabstore_common::messages::messages;
 use crabstore_common::messages::MessageCodec;
 use crabstore_common::messages::Messages;
+use crabstore_common::objectid::ObjectId;
+use crabstore_common::objecthandle::ObjectHandle;
 use dlmalloc::Dlmalloc;
 
 use log::debug;
+
+use std::os::raw::c_int;
 
 use prost::Message;
 use std::io;
@@ -20,11 +26,46 @@ use tokio_util::codec::Encoder;
 
 
 #[derive(Clone)]
-pub struct ObjectID(crabstore_common::objectid::ObjectId);
+pub struct ObjectID(ObjectId);
 
 impl ObjectID {
     pub fn from_binary(binary: &[u8]) -> Self {
-        ObjectID(crabstore_common::objectid::ObjectId::from_binary(binary))
+        ObjectID(ObjectId::from_binary(binary))
+    }
+}
+
+struct OidRecord {
+    oidmap: std::collections::HashMap<ObjectId, ObjectHandle>,
+}
+
+impl OidRecord {
+    pub fn new() -> Self {
+        OidRecord {
+            oidmap: std::collections::HashMap::new(),
+        }
+    }
+    pub fn insert(
+        &mut self,
+        oid: ObjectId,
+        fd: c_int,
+        offset: usize,
+        size: usize
+    ) {
+        assert!(self
+            .oidmap
+            .insert(oid, ObjectHandle::new(fd, offset, size))
+            .is_none());
+    }
+
+    pub fn remove(
+        &mut self,
+        oid: ObjectId
+    ) -> Option<ObjectHandle> {
+        self.oidmap.remove(&oid)
+    }
+
+    pub fn get(&self, oid: &ObjectId) -> Option<ObjectHandle> {
+        self.oidmap.get(&oid).cloned()
     }
 }
 
@@ -32,10 +73,17 @@ pub struct CrabClient {
     socket_name: PathBuf,
     stream: Option<Mutex<UnixStream>>,
     allocator: Dlmalloc<allocator::UnixSHM>,
+    oids: OidRecord,
 }
 
 impl CrabClient {
-    pub fn send_request(&mut self, request: Messages) -> Result<(), io::Error> {
+    fn handle_from_oid(&self, oid: &ObjectId) -> Option<ObjectHandle> {
+        self.oids.get(&oid)
+    }
+}
+
+impl CrabClient {
+    fn send_request(&mut self, request: Messages) -> Result<(), io::Error> {
         if let Some(stream_mutex) = &mut self.stream {
             let stream = stream_mutex.get_mut().unwrap();
             let mut mc = MessageCodec {};
@@ -50,7 +98,7 @@ impl CrabClient {
         }
     }
 
-    pub fn receive_response(&mut self) -> Result<Messages, io::Error> {
+    fn receive_response(&mut self) -> Result<Messages, io::Error> {
         if let Some(stream_mutex) = &mut self.stream {
             let stream = stream_mutex.get_mut().unwrap();
 
@@ -134,6 +182,26 @@ impl CrabClient {
                         )),
                     }
                 }
+                6 => {
+                    let cr = messages::OidSealRequest::decode(src);
+                    match cr {
+                        Ok(cr) => Ok(Messages::OidSealRequest(cr)),
+                        Err(_) => Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Message decoding failed",
+                        )),
+                    }
+                }
+                7 => {
+                    let cr = messages::OidSealResponse::decode(src);
+                    match cr {
+                        Ok(cr) => Ok(Messages::OidSealResponse(cr)),
+                        Err(_) => Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Message decoding failed",
+                        )),
+                    }
+                }
                 _ => {
                     // Unknown message type
                     Err(io::Error::new(
@@ -150,7 +218,7 @@ impl CrabClient {
         }
     }
 
-    pub fn reserve_oid(&mut self, oid: ObjectID, size: u64) -> io::Result<bool> {
+    fn reserve_oid(&mut self, oid: ObjectID, size: u64) -> io::Result<bool> {
         let request = Messages::OidReserveRequest(messages::OidReserveRequest {
             object_id: oid.0.binary(),
             size,
@@ -161,7 +229,32 @@ impl CrabClient {
         match self.receive_response() {
             Ok(Messages::OidReserveResponse(cr)) => {
                 debug!("OidReserve response received {:?}", cr);
-                println!("OidReserve response received {:?}", cr);
+                Ok(true)
+            }
+            Ok(r) => {
+                debug!("Invalid response received {:?}", r);
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid response received from sever",
+                ))
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    fn seal_oid(&mut self, oid: ObjectID, handle: ObjectHandle) -> io::Result<bool> {
+        let request = Messages::OidSealRequest(messages::OidSealRequest {
+            object_id: oid.0.binary(),
+            fd: handle.fd,
+            offset: handle.offset as u64,
+            size: handle.size as u64
+        });
+        self.send_request(request)?;
+
+        debug!("Sent Oid Seal request to the server");
+        match self.receive_response() {
+            Ok(Messages::OidSealResponse(cr)) => {
+                debug!("OidSeal response received {:?}", cr);
                 Ok(true)
             }
             Ok(r) => {
@@ -182,6 +275,7 @@ impl CrabClient {
             socket_name,
             stream: None,
             allocator: Dlmalloc::new_with_allocator(allocator::UnixSHM::new()),
+            oids: OidRecord::new(),
         }
     }
 
@@ -215,13 +309,30 @@ impl CrabClient {
         oid: ObjectID,
         data_size: usize,
     ) -> Result<&mut [u8],&'static str> {
-        if self.reserve_oid(oid, data_size as u64).is_err() {
+        if self.reserve_oid(oid.clone(), data_size as u64).is_err() {
             return Err("ObjectID not available");
         }
 
         unsafe {
             let ptr = self.allocator.malloc(data_size, 1);
+            let (fd,offset) = self.allocator.get_allocator().get_fd_offset_for_ptr(ptr).expect("allocator returned a pointer that does not exist in underlying allocator records.");
+            self.oids.insert(oid.0, fd, offset, data_size);
             Ok(slice::from_raw_parts_mut(ptr, data_size))
+        }
+    }
+
+    pub fn seal(&mut self, oid: ObjectID) -> Result<(),String> {
+        let handle = match self.handle_from_oid(&oid.0) {
+            None => {
+                return Err("Invalid ObjectID supplied!".to_string());
+            }
+            Some(h) => h
+        };
+        match self.seal_oid(oid, handle) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                Err(format!("Error during sea: {}", e.to_string()))
+            }
         }
     }
 }
