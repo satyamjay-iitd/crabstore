@@ -2,9 +2,7 @@ use crabstore_common::messages::messages;
 use crabstore_common::messages::MessageCodec;
 use crabstore_common::messages::Messages;
 use futures::SinkExt;
-use log::debug;
-use log::error;
-use log::info;
+use log::{debug,warn,error,info};
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
@@ -38,12 +36,25 @@ impl CrabStore {
                 }
                 _ = signal::ctrl_c() => {
                     info!("Shutting down the server");
+                    drop(listener);
+                    self.cleanup().await;
                     break;
                 }
             }
         }
 
         Ok(())
+    }
+
+    pub async fn cleanup(&self) -> io::Result<()> {
+        // remove the created socket
+        if Path::new(&self.socket_path).exists() {
+            info!("Removing socket at path {:?}", self.socket_path);
+            std::fs::remove_file(&self.socket_path)
+        } else {
+            warn!("Socket {:?} does not exist!  This is unexpected!", self.socket_path);
+            Ok(())
+        }
     }
 }
 

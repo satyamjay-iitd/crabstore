@@ -3,15 +3,27 @@
 Crabstore is(will be) an in memory distributed object store.
 
 ## Instructions
-#### Run Server
-> RUST_LOG=debug cargo run -- -s sock_path -m 1123 -d 123123
+
+#### Build and Run Server
+
+```sh
+RUST_LOG=debug cargo run -- -s sock_path -m 1123
+```
 
 #### Install client
-```python
-pip install maturin
+
+```sh
 cd crates/crabstore-client
+# create virtual environment
+python3 -m venv venv
+# switch to it
+source venv/bin/activate
+# install maturin
+pip install maturin
+# build
 maturin develop
-python crates/crabstore-client/examples/test_python_client.py
+# run test -- you will need numpy (pip install numpy)
+python examples/test_python_client.py  ../../sock_path
 ```
 Make sure the socket path is correct in the client.
 
