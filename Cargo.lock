@@ -231,6 +231,7 @@ name = "crabstore-python-client"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "crabstore-client",
  "crabstore-common",
  "dlmalloc",
  "futures",

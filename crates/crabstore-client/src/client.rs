@@ -35,7 +35,7 @@ pub struct CrabClient {
 }
 
 impl CrabClient {
-    fn send_request(&mut self, request: Messages) -> Result<(), io::Error> {
+    pub fn send_request(&mut self, request: Messages) -> Result<(), io::Error> {
         if let Some(stream_mutex) = &mut self.stream {
             let stream = stream_mutex.get_mut().unwrap();
             let mut mc = MessageCodec {};
@@ -50,7 +50,7 @@ impl CrabClient {
         }
     }
 
-    fn receive_response(&mut self) -> Result<Messages, io::Error> {
+    pub fn receive_response(&mut self) -> Result<Messages, io::Error> {
         if let Some(stream_mutex) = &mut self.stream {
             let stream = stream_mutex.get_mut().unwrap();
 
@@ -150,7 +150,7 @@ impl CrabClient {
         }
     }
 
-    fn reserve_oid(&mut self, oid: ObjectID, size: u64) -> io::Result<bool> {
+    pub fn reserve_oid(&mut self, oid: ObjectID, size: u64) -> io::Result<bool> {
         let request = Messages::OidReserveRequest(messages::OidReserveRequest {
             object_id: oid.0.binary(),
             size,
@@ -185,25 +185,16 @@ impl CrabClient {
         }
     }
 
-    pub fn connect(&mut self) -> Result<(),String> {
-        match UnixStream::connect(&self.socket_name) {
-            Err(e) => {
-                return Err(e.to_string())
-            },
-            Ok(stream) => {
-                self.stream = Some(Mutex::new(stream));
-            }
-        };
+    pub fn connect(&mut self) -> Result<(),io::Error> {
+        let stream = UnixStream::connect(&self.socket_name)?;
+        self.stream = Some(Mutex::new(stream));
         debug!(
             "Connection with server established on socket_path = {:?}",
             &self.socket_name
         );
 
         let request = Messages::ConnectRequest(messages::ConnectRequest {});
-        match self.send_request(request) {
-            Err(e) => return Err(e.to_string()),
-                _ => {}
-        };
+        self.send_request(request)?;
         debug!("Sent CONNECTION request to the server");
 
         match self.receive_response() {
@@ -213,9 +204,9 @@ impl CrabClient {
             }
             Ok(r) => {
                 debug!("Invalid response received {:?}", r);
-                Err("Invalid response received from sever".to_string())
+                Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid response received from server"))
             }
-            Err(e) => Err(e.to_string())
+            Err(e) => Err(e)
         }
     }
 
@@ -223,14 +214,14 @@ impl CrabClient {
         &mut self,
         oid: ObjectID,
         data_size: usize,
-    ) -> Result<&[u8],&'static str> {
+    ) -> Result<&mut [u8],&'static str> {
         if self.reserve_oid(oid, data_size as u64).is_err() {
             return Err("ObjectID not available");
         }
 
         unsafe {
             let ptr = self.allocator.malloc(data_size, 1);
-            Ok(slice::from_raw_parts(ptr, data_size))
+            Ok(slice::from_raw_parts_mut(ptr, data_size))
         }
     }
 }

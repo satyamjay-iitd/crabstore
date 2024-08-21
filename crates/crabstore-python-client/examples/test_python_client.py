@@ -39,22 +39,4 @@ def main():
     for i in range(100):
         alloc(c, 2**30)
 
-        
-    # l = []
-    # for i in range(100):
-    #     oid = crabstore_client.ObjectID.from_binary(b'00000000000000000000')
-    #     b = c.create(oid, 2**30)
-    #     arr = np.frombuffer(b)
-    #     arr[0] = 234
-    #     sleep(0.2)
-    #     l.append(b)
-    # b = c.create(oid, 2**30)
-
-    # sleep(100)
-
-    # arr = np.frombuffer(b)
-    # arr[0] = 234
-    # print(arr)
-
-
 main()

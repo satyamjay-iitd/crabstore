@@ -4,5 +4,5 @@ run_server:
 run_client:
 	cd crates/crabstore-client; cargo run --example demo
 
-# run_python_client:
-#	cd crates/crabstore-client; . venv/bin/activate; maturin develop && python examples/test_python_client.py /tmp/sock_path
+run_python_client:
+	cd crates/crabstore-python-client; . venv/bin/activate; maturin develop && python examples/test_python_client.py /tmp/sock_path

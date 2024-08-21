@@ -31,7 +31,6 @@ dlmalloc = { git = "https://github.com/satyamjay-iitd/dlmalloc-rs"}
 [build-dependencies]
 prost-build = "0.13"
 
-
 [lints]
 workspace = true
 

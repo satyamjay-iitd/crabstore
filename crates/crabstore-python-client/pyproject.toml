@@ -3,7 +3,7 @@ requires = ["maturin>=1,<2"]
 build-backend = "maturin"
 
 [project]
-name = "crabstore_client"
+name = "crabstore_python_client"
 requires-python = ">=3.7"
 classifiers = [
     "Programming Language :: Rust",

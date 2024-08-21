@@ -16,6 +16,7 @@ libc = { version = "0.2", default-features = false }
 
 [dependencies]
 crabstore-common = {path = "../crabstore-common"}
+crabstore-client = {path = "../crabstore-client"}
 log.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
@@ -32,14 +33,5 @@ dlmalloc = { git = "https://github.com/satyamjay-iitd/dlmalloc-rs"}
 [build-dependencies]
 prost-build = "0.13"
 
-
 [lints]
 workspace = true
-
-[[example]]
-name = "demo"
-path = "examples/demo.rs"
-
-[[example]]
-name = "test"
-path = "examples/test_rust_client.rs"
