@@ -14,16 +14,13 @@ struct CliArgs {
 
     #[arg(short = 'm', long, default_value_t = 1000000)]
     sys_memory: i64,
-
-    #[arg(short = 'd', long)]
-    mem_mapped_dir: PathBuf,
 }
 
 fn main() {
     env_logger::init();
     let args = CliArgs::parse();
 
-    let runner = runner::Runner::new(args.socket_path, args.sys_memory, args.mem_mapped_dir);
+    let runner = runner::Runner::new(args.socket_path, args.sys_memory);
 
     runner.start();
 }

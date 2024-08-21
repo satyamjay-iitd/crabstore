@@ -14,6 +14,8 @@ enum MessageType {
     ConnectResponseMT = 1,
     CreateRequestMT = 2,
     CreateResponseMT = 3,
+    OidReserveRequestMT = 4,
+    OidReserveResponseMT = 5,
 }
 
 #[derive(Debug)]
@@ -22,6 +24,8 @@ pub enum Messages {
     ConnectResponse(messages::ConnectResponse),
     CreateRequest(messages::CreateRequest),
     CreateResponse(messages::CreateResponse),
+    OidReserveRequest(messages::OidReserveRequest),
+    OidReserveResponse(messages::OidReserveResponse),
 }
 
 pub struct MessageCodec;
@@ -123,6 +127,22 @@ impl Encoder<Messages> for MessageCodec {
                 let message_type = MessageType::CreateResponseMT as u16;
                 dst.put_u16_le(message_type);
                 dst.put_u64_le(messages::CreateResponse::encoded_len(&cr) as u64);
+
+                cr.encode(dst)?;
+                Ok(())
+            }
+            Messages::OidReserveRequest(cr) => {
+                let message_type = MessageType::OidReserveRequestMT as u16;
+                dst.put_u16_le(message_type);
+                dst.put_u64_le(messages::OidReserveRequest::encoded_len(&cr) as u64);
+
+                cr.encode(dst)?;
+                Ok(())
+            }
+            Messages::OidReserveResponse(cr) => {
+                let message_type = MessageType::OidReserveResponseMT as u16;
+                dst.put_u16_le(message_type);
+                dst.put_u64_le(messages::OidReserveResponse::encoded_len(&cr) as u64);
 
                 cr.encode(dst)?;
                 Ok(())

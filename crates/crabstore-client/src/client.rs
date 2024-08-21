@@ -3,14 +3,17 @@ use crabstore_common::messages::messages;
 use crabstore_common::messages::MessageCodec;
 use crabstore_common::messages::Messages;
 use dlmalloc::Dlmalloc;
+
 use log::debug;
+
 use prost::Message;
+
 use pyo3::exceptions as pyexceptions;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyByteArray;
-use pyo3::types::PyBytes;
 use pyo3::types::PyMemoryView;
+use pyo3::Bound;
+
 use std::io;
 use std::io::Read;
 use std::io::Write;
@@ -18,10 +21,10 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use crate::allocator;
-use std::borrow::Cow;
-use std::slice;
 use tokio_util::codec::Encoder;
+
+use crate::allocator;
+use crate::rust_2_py::FromPtr;
 
 #[pyclass]
 #[derive(Clone)]
@@ -138,11 +141,29 @@ impl CrabClient {
         }
     }
 
-    fn reserve_oid(&mut self, oid: ObjectID) -> bool {
-        true
-    }
+    fn reserve_oid(&mut self, oid: ObjectID, size: u64) -> io::Result<bool> {
+        let request = Messages::OidReserveRequest(messages::OidReserveRequest {
+            object_id: oid.0.binary(),
+            size,
+        });
+        self.send_request(request)?;
 
-    fn notify_allocation(&mut self) {}
+        debug!("Sent Oid Reserve request to the server");
+        match self.receive_response() {
+            Ok(Messages::OidReserveResponse(cr)) => {
+                debug!("Connection response received {:?}", cr);
+                Ok(true)
+            }
+            Ok(r) => {
+                debug!("Invalid response received {:?}", r);
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid response received from sever",
+                ))
+            }
+            Err(err) => Err(err),
+        }
+    }
 }
 
 #[pymethods]
@@ -188,24 +209,17 @@ impl CrabClient {
         py: Python<'a>,
         oid: ObjectID,
         data_size: usize,
-        // ) -> PyResult<Bound<'a, PyBytes>> {
-    ) -> PyResult<Bound<'a, PyByteArray>> {
-        // ) -> PyResult<PyBytes> {
-        if !self.reserve_oid(oid) {
+    ) -> PyResult<Bound<'a, PyMemoryView>> {
+        if !self
+            .reserve_oid(oid, data_size as u64)
+            .map_err(|_| pyexceptions::PyValueError::new_err("Error in sever connection"))?
+        {
             return Err(PyValueError::new_err("ObjectID not available"));
         }
 
         unsafe {
             let ptr = self.allocator.malloc(data_size, 1);
-
-            Ok(PyByteArray::new_bound(
-                py,
-                slice::from_raw_parts(ptr, data_size),
-            ))
-            // Ok(PyByteArray::bound_from_ptr(py, ptr, data_size));
-            // Ok(PyBytes::new_bound_with(ptr))
-            // Ok(PyBytes::bound_from_ptr(py, ptr, data_size))
-            // return Ok(Cow::Borrowed(slice));
+            PyMemoryView::from_raw_ptr(py, ptr, data_size)
         }
 
         // self.notify_allocation();

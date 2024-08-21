@@ -8,26 +8,18 @@ use log::info;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::signal;
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
-use crate::allocator::RamAllocator;
-
 pub struct CrabStore {
     socket_path: PathBuf,
-    allocator: Arc<Mutex<RamAllocator>>,
 }
 
 impl CrabStore {
-    pub fn new(socket_path: PathBuf, allocator: RamAllocator) -> Self {
-        let allocator_mutex = Arc::new(Mutex::new(allocator));
-        CrabStore {
-            socket_path,
-            allocator: allocator_mutex,
-        }
+    pub fn new(socket_path: PathBuf) -> Self {
+        CrabStore { socket_path }
     }
 
     pub async fn start(&self) -> io::Result<()> {
@@ -40,9 +32,8 @@ impl CrabStore {
         loop {
             tokio::select! {
                 Ok((stream, _)) = listener.accept() => {
-                    let allocator = self.allocator.clone();
                     tokio::spawn(async move {
-                        handle_client(stream, allocator).await.expect("Error Happened during handling client");
+                        handle_client(stream).await.expect("Error Happened during handling client");
                     });
                 }
                 _ = signal::ctrl_c() => {
@@ -56,7 +47,7 @@ impl CrabStore {
     }
 }
 
-async fn handle_client(stream: UnixStream, allocator: Arc<Mutex<RamAllocator>>) -> io::Result<()> {
+async fn handle_client(stream: UnixStream) -> io::Result<()> {
     let mut framed = Framed::new(stream, MessageCodec {});
 
     while let Some(request) = framed.next().await {
@@ -95,6 +86,12 @@ async fn handle_client(stream: UnixStream, allocator: Arc<Mutex<RamAllocator>>) 
                 let response = Messages::ConnectResponse(messages::ConnectResponse {
                     memory_capacity: 200,
                 });
+                framed.send(response).await?;
+            }
+            Ok(Messages::OidReserveRequest(_cr)) => {
+                debug!("Connect request received.");
+                let response =
+                    Messages::OidReserveResponse(messages::OidReserveResponse { oid_state: 0 });
                 framed.send(response).await?;
             }
             Ok(invalid_request) => {
