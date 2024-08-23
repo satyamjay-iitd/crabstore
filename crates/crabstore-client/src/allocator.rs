@@ -1,10 +1,10 @@
 extern crate std;
 
 use core::ptr;
-use dlmalloc::Allocator;
+use dlmalloc::{Allocator, Dlmalloc};
 
 use nix;
-use std::os::fd::{AsFd,AsRawFd};
+use std::os::fd::{AsFd, AsRawFd};
 use std::os::raw::c_int;
 use std::string::ToString;
 
@@ -40,10 +40,10 @@ impl MMapRecord {
     pub fn get_fd_offset_for_ptr(&self, ptr: *mut u8) -> Option<(c_int, usize)> {
         let ptr_us = ptr as usize;
         for (mp, t) in self.addr2fdsize.iter() {
-            let (fd,sz) = t;
+            let (fd, sz) = t;
             let mp_us = (*mp) as usize;
             if (ptr_us - mp_us) < *sz {
-                return Some(((*fd).as_raw_fd(), ptr_us - mp_us))
+                return Some(((*fd).as_raw_fd(), ptr_us - mp_us));
             }
         }
         None

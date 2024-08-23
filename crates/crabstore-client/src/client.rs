@@ -4,8 +4,8 @@ use bytes::BytesMut;
 use crabstore_common::messages::messages;
 use crabstore_common::messages::MessageCodec;
 use crabstore_common::messages::Messages;
-use crabstore_common::objectid::ObjectId;
 use crabstore_common::objecthandle::ObjectHandle;
+use crabstore_common::objectid::ObjectId;
 use dlmalloc::Dlmalloc;
 
 use log::debug;
@@ -23,7 +23,6 @@ use std::sync::Mutex;
 use crate::allocator;
 use std::slice;
 use tokio_util::codec::Encoder;
-
 
 #[derive(Clone)]
 pub struct ObjectID(ObjectId);
@@ -44,23 +43,14 @@ impl OidRecord {
             oidmap: std::collections::HashMap::new(),
         }
     }
-    pub fn insert(
-        &mut self,
-        oid: ObjectId,
-        fd: c_int,
-        offset: usize,
-        size: usize
-    ) {
+    pub fn insert(&mut self, oid: ObjectId, fd: c_int, offset: usize, size: usize) {
         assert!(self
             .oidmap
             .insert(oid, ObjectHandle::new(fd, offset, size))
             .is_none());
     }
 
-    pub fn remove(
-        &mut self,
-        oid: ObjectId
-    ) -> Option<ObjectHandle> {
+    pub fn remove(&mut self, oid: ObjectId) -> Option<ObjectHandle> {
         self.oidmap.remove(&oid)
     }
 
@@ -247,7 +237,7 @@ impl CrabClient {
             object_id: oid.0.binary(),
             fd: handle.fd,
             offset: handle.offset as u64,
-            size: handle.size as u64
+            size: handle.size as u64,
         });
         self.send_request(request)?;
 
@@ -279,7 +269,7 @@ impl CrabClient {
         }
     }
 
-    pub fn connect(&mut self) -> Result<(),io::Error> {
+    pub fn connect(&mut self) -> Result<(), io::Error> {
         let stream = UnixStream::connect(&self.socket_name)?;
         self.stream = Some(Mutex::new(stream));
         debug!(
@@ -298,9 +288,12 @@ impl CrabClient {
             }
             Ok(r) => {
                 debug!("Invalid response received {:?}", r);
-                Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid response received from server"))
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid response received from server",
+                ))
             }
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         }
     }
 
@@ -308,31 +301,35 @@ impl CrabClient {
         &mut self,
         oid: ObjectID,
         data_size: usize,
-    ) -> Result<&mut [u8],&'static str> {
+    ) -> Result<&mut [u8], &'static str> {
         if self.reserve_oid(oid.clone(), data_size as u64).is_err() {
             return Err("ObjectID not available");
         }
 
         unsafe {
             let ptr = self.allocator.malloc(data_size, 1);
-            let (fd,offset) = self.allocator.get_allocator().get_fd_offset_for_ptr(ptr).expect("allocator returned a pointer that does not exist in underlying allocator records.");
+            let (fd, offset) = self
+                .allocator
+                .get_allocator()
+                .get_fd_offset_for_ptr(ptr)
+                .expect(
+                "allocator returned a pointer that does not exist in underlying allocator records.",
+            );
             self.oids.insert(oid.0, fd, offset, data_size);
             Ok(slice::from_raw_parts_mut(ptr, data_size))
         }
     }
 
-    pub fn seal(&mut self, oid: ObjectID) -> Result<(),String> {
+    pub fn seal(&mut self, oid: ObjectID) -> Result<(), String> {
         let handle = match self.handle_from_oid(&oid.0) {
             None => {
                 return Err("Invalid ObjectID supplied!".to_string());
             }
-            Some(h) => h
+            Some(h) => h,
         };
         match self.seal_oid(oid, handle) {
             Ok(_) => Ok(()),
-            Err(e) => {
-                Err(format!("Error during sea: {}", e.to_string()))
-            }
+            Err(e) => Err(format!("Error during seal: {}", e.to_string())),
         }
     }
 }

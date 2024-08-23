@@ -26,8 +26,8 @@ prost-types.workspace = true
 tokio-serde = "0.9"
 bytes.workspace = true
 nix = { version = "0.29.0", features = ["fs", "mman"] }
-dlmalloc = { path = "../../../dlmalloc-rs-upstream"}
-# dlmalloc = { git = "https://github.com/satyamjay-iitd/dlmalloc-rs"}
+# dlmalloc = { path = "../../../dlmalloc-rs-upstream"}
+dlmalloc = { git = "https://github.com/satyamjay-iitd/dlmalloc-rs"}
 env_logger.workspace = true
 
 [build-dependencies]
